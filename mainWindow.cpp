@@ -1,5 +1,7 @@
 #include "mainWindow.h"
 
+// TODO Arrows of digraph
+
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
 	ui.setupUi(this);
 
@@ -322,6 +324,9 @@ void MainWindow::on_hasseBtn_clicked() {
 
 	Relation r(filePath);
 	displayOriginalMatrix(r);
+
+	drawOriginalNodes(r.getDimension());
+	drawLines(r.getDimension(), r.getMatrix());
 
 	if (r.isPartial()) {
 		Relation rr = r.hasse();
