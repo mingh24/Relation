@@ -10,14 +10,14 @@ Relation::Relation(int d) {
 }
 
 Relation::Relation(int d, const int* m) {
-	// Construct a relation from the dimension of its relational matrix and the array of the relational matrix
+	// Construct a relation from the dimension of its relational tempMatrix and the array of the relational tempMatrix
 	dimension = d;
 	matrix = new int[dimension * dimension];
 	memcpy(matrix, m, sizeof(int) * dimension * dimension);
 }
 
 Relation::Relation(const string filePath) {
-	// Read the matrix of a relation from a file
+	// Read the tempMatrix of a relation from a file
 	ifstream readStream(filePath);
 	if (!readStream) {
 		cout << "Fail to open." << endl;
@@ -27,8 +27,8 @@ Relation::Relation(const string filePath) {
 		int row, column;
 		readStream >> dimension;
 		matrix = new int[dimension * dimension];
-		for (row = 0; row < dimension; row++)
-			for (column = 0; column < dimension; column++)
+		for (row = 0; row < dimension; ++row)
+			for (column = 0; column < dimension; ++column)
 				readStream >> matrix[row * dimension + column];
 	}
 	readStream.close();
@@ -37,6 +37,7 @@ Relation::Relation(const string filePath) {
 Relation::~Relation() {
 	// Destructor
 	delete[] matrix;
+	matrix = nullptr;
 }
 
 Relation::Relation(const Relation & r) {
@@ -55,12 +56,12 @@ Relation& Relation::operator =(const Relation & r) {
 //---------------------------------------------------------------------------------------------------
 
 int Relation::getDimension() const {
-	// Get the dimension of relational matrix
+	// Get the dimension of relational tempMatrix
 	return dimension;
 }
 
 int Relation::getAtPosition(int row, int column) const {
-	// Gets the value at the cross position in column-th column and flags-th flags of the relational matrix, and this function returns -1 if it is over the boundary.
+	// Get the value at the cross position in row-th row and column-th column of the relational tempMatrix, and this function returns -1 if it is over the boundary.
 	if (row >= 0 && row < dimension && column >= 0 && column < dimension)
 		return matrix[row * dimension + column];
 	else
@@ -68,7 +69,7 @@ int Relation::getAtPosition(int row, int column) const {
 }
 
 int Relation::operator()(int row, int column) const {
-	// You can use R(flags, jcolumn) to get the value at the cross position in flags-th flags and column-th column of the relational matrix, and this function returns - 1 if it is over the boundary.
+	// You can use R(row, column) to get the value at the cross position in row-th row and column-th column of the relational tempMatrix, and this function returns - 1 if it is over the boundary.
 	if (row >= 0 && row < dimension && column >= 0 && column < dimension)
 		return matrix[row * dimension + column];
 	else
@@ -76,17 +77,19 @@ int Relation::operator()(int row, int column) const {
 }
 
 int* Relation::getMatrix() const {
-	// Get the relational matrix
+	// Get the relational tempMatrix
 	return matrix;
 }
 
+//---------------------------------------------------------------------------------------------------
+
 void Relation::output() const {
-	// Display the matrix of the relation on the screen
+	// Display the tempMatrix of the relation on the screen
 	int row, column;
 	cout << "The dimension is: " << dimension << endl;
-	for (row = 0; row < dimension; row++)
+	for (row = 0; row < dimension; ++row)
 	{
-		for (column = 0; column < dimension; column++)
+		for (column = 0; column < dimension; ++column)
 		{
 			cout << (*this)(row, column) << "   ";
 		}
@@ -95,7 +98,7 @@ void Relation::output() const {
 }
 
 bool Relation::outputToFile(const string filePath) const {
-	// Write the relation matrix to a file in the same format as the read file
+	// Write the relation tempMatrix to a file in the same format as the read file
 	ofstream writeStream(filePath);
 	if (!writeStream) {
 		cout << "Fail to open." << endl;
@@ -104,8 +107,8 @@ bool Relation::outputToFile(const string filePath) const {
 	else {
 		int row, column;
 		writeStream << dimension << endl;
-		for (row = 0; row < dimension; row++) {
-			for (column = 0; column < dimension; column++)
+		for (row = 0; row < dimension; ++row) {
+			for (column = 0; column < dimension; ++column)
 				writeStream << matrix[row * dimension + column] << "   ";
 			writeStream << endl;
 		}
@@ -114,6 +117,8 @@ bool Relation::outputToFile(const string filePath) const {
 	writeStream.close();
 	return true;
 }
+
+//---------------------------------------------------------------------------------------------------
 
 bool Relation::isReflexive() const {
 	int row;
@@ -194,6 +199,8 @@ bool Relation::isPartial() const {
 	return isReflexive() && isAntisymmetric() && isTransitive();
 }
 
+//---------------------------------------------------------------------------------------------------
+
 Relation Relation::getReflexiveClosure() const {
 	int* m = new int[dimension * dimension];
 	m = getMatrix();
@@ -215,7 +222,7 @@ Relation Relation::getSymmetricClosure() const {
 	int* transpose = new int[dimension * dimension];
 	int row, column;
 
-	// Get the transposed matrix
+	// Get the transposed tempMatrix
 	for (row = 0; row < dimension; ++row) {
 		for (column = 0; column < dimension; ++column) {
 			transpose[row * dimension + column] = m[column * dimension + row];
@@ -258,6 +265,8 @@ Relation Relation::getEquivalenceClosure() const {
 	return this->getReflexiveClosure().getSymmetricClosure().getTransitiveClosure();
 }
 
+//---------------------------------------------------------------------------------------------------
+
 int* Relation::getEquivalenceClasses() const {
 	int row, column, number = 0;
 	int* result = (int*)malloc(sizeof(int) * dimension);
@@ -280,51 +289,83 @@ int* Relation::getEquivalenceClasses() const {
 	//return 0;
 }
 
-int* Relation::topologicallySorting() const {
-	int* vertices = (int*)malloc(sizeof(int) * dimension);
-	int* arcs = getMatrix();
-	int* result = (int*)malloc(sizeof(int) * dimension);
-	int* flags = (int*)malloc(sizeof(int) * dimension);	// 按照列来设置标志，为1表示已经输出（不再考虑），为0表示未输出。
-	int flag = 1;									// 标志符，1表示已经输出（不再考虑），为0表示未输出，赋给flags数组
+Relation Relation::hasse() const {
+	int* result = getMatrix();
 
-	for (int i = 0; i < dimension; ++i) {
-		flags[i] = 0;
-		vertices[i] = i;
-		result[i] = 0;
-	}
+	for (int i = 0; i < dimension; ++i)
+		result[i * dimension + i] = 0;
 
-	int i, j, k, m = 0, t;
-	int s = 0;
+	for (int i = 0; i < dimension; ++i)
+		for (int j = 0; j < dimension; ++j)
+			for (int k = 0; k < dimension; ++k)
+				if (1 == result[i * dimension + j] && 1 == result[j * dimension + k])
+					result[i * dimension + k] = 0;
 
-	for (i = 0; i < dimension; ++i) {
-		for (j = 0; j < dimension; ++j) {
-			if (flags[j] == 0) {				//	活动j还未输出
-				t = 1;		// 标识符
-				for (k = 0; k < dimension; ++k)
-					if (arcs[k * dimension + j] == 1) {		//当前活动有入度（活动k必须在活动j之前）
-						t = 0;
-						break;
-					}
-				if (t == 1) {		// 活动j没有入度
-					m = j;
+	Relation r(dimension, result);
+	return r;
+}
+
+int* Relation::topoSorting() const {
+	bool zeroIndegree;
+	int* tempMatrix = new int[dimension * dimension];
+	int* result = new int[dimension];
+	bool* isAdded = new bool[dimension];
+	queue<int> queue;
+	int count = 0;
+
+	for (int i = 0; i < dimension; ++i)
+		isAdded[i] = false;
+
+	for (int row = 0; row < dimension; ++row)
+		for (int column = 0; column < dimension; ++column)
+			tempMatrix[row * dimension + column] = (*this)(row, column);
+
+	while (count < dimension) {
+		for (int column = 0; column < dimension; ++column) {
+			zeroIndegree = true;
+			for (int row = 0; row < dimension; ++row) {
+				if (1 == tempMatrix[row * dimension + column]) {
+					zeroIndegree = false;
 					break;
 				}
 			}
+
+			if (zeroIndegree) {
+				// If the indegree is 0, then push column-th node into queue
+				if (false == isAdded[column])
+					queue.push(column);
+				isAdded[column] = true;
+			}
 		}
-		if (j != dimension) {
-			flags[m] = flag;
-			result[s++] = vertices[m];
-			for (k = 0; k < dimension; ++k)
-				arcs[m * dimension + k] = 0;		// 将已经输出的活动所到达的下个活动的入度置为0
-			flag++;
+
+		if (!queue.empty()) {
+			int temp = queue.front();
+			result[count] = temp;
+			queue.pop();
+			// Delete all edges starting from No.temp node
+			for (int i = 0; i < dimension; ++i)
+				tempMatrix[temp * dimension + i] = 0;
 		}
-		else
-			break;
+		++count;
 	}
 
-	if (flag - 1 < dimension) {	// 当flags中不是所有的元素都被赋予新值v时，说明有环存在
-		return nullptr;
+	for (int i = 0; i < dimension; ++i) {
+		if (false == isAdded[i]) {
+			delete[] isAdded;
+			isAdded = nullptr;
+			delete[] tempMatrix;
+			tempMatrix = nullptr;
+			delete[] result;
+			result = nullptr;
+
+			return nullptr;
+		}
 	}
+
+	delete[] isAdded;
+	isAdded = nullptr;
+	delete[] tempMatrix;
+	tempMatrix = nullptr;
 
 	return result;
 }
